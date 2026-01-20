@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>QNITY DAILY TRIPS DATA</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+body { background:#f5f5f5; padding:10px; }
+.report-container { background:#fff; padding:10px; border:2px solid #000; }
+h2 { text-align:center; font-weight:bold; font-size:18px; margin-bottom:10px; }
+
+.table-wrapper { overflow-x:auto; }
+
+table {
+  border-collapse:collapse;
+  font-size:11px;
+  width:100%;
+  table-layout:auto;
+}
+
+th, td {
+  border:1px solid #000;
+  padding:3px 4px;
+  text-align:center;
+  vertical-align:middle;
+  white-space:nowrap;
+}
+
+th { font-weight:bold; }
+
+.summary-table {
+  width:220px;
+  font-size:12px;
+}
+
+.total-box {
+  border:2px solid #000;
+  padding:10px;
+  font-size:16px;
+  font-weight:bold;
+}
+
+textarea {
+  width:100%;
+  height:180px;
+  font-size:13px;
+}
+
+.editable { cursor:text; }
+
+@media print {
+  textarea, button, .controls { display:none; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container-fluid">
+
+<div class="mb-2">
+<label class="fw-bold">Select Date</label>
+<input type="date" id="reportDate" class="form-control form-control-sm w-auto mb-2">
+
+<label class="fw-bold">Paste Daily Fleet Data</label>
+<textarea id="rawData"></textarea>
+
+<button class="btn btn-primary btn-sm mt-2" onclick="generateReport()">Generate Report</button>
+</div>
+
+<div id="report" class="report-container">
+
+<h2 id="title">QNITY DAILY TRIPS DATA</h2>
+
+<div class="table-wrapper">
+<table id="mainTable">
+<thead id="tableHead"></thead>
+<tbody id="tableBody"></tbody>
+</table>
+</div>
+
+<div class="row mt-3">
+<div class="col-md-4">
+<table class="summary-table">
+<thead><tr><th>Time</th><th>Logins</th></tr></thead>
+<tbody id="loginSummary"></tbody>
+</table>
+<div class="fw-bold mt-1">Total Pickups: <span id="totalPickups">0</span></div>
+</div>
+
+<div class="col-md-4">
+<table class="summary-table">
+<thead><tr><th>Time</th><th>Logouts</th></tr></thead>
+<tbody id="logoutSummary"></tbody>
+</table>
+<div class="fw-bold mt-1">Total Logouts: <span id="totalLogouts">0</span></div>
+</div>
+
+<div class="col-md-4 d-flex align-items-center justify-content-center">
+<div class="total-box text-center">
+Total Trips<br>
+<span id="totalTrips">0</span>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="controls mt-2">
+<button class="btn btn-success btn-sm" onclick="downloadPDF()">PDF</button>
+<button class="btn btn-warning btn-sm" onclick="downloadExcel()">Excel</button>
+<button class="btn btn-info btn-sm" onclick="downloadImage()">Image</button>
+</div>
+
+</div>
+
+<script>
+function generateReport() {
+
+const lines = document.getElementById("rawData").value.split(/\r?\n/);
+
+const data = {};
+const loginTimes = new Set();
+const logoutTimes = new Set();
+
+let currentType = null;
+let currentTime = null;
+
+lines.forEach(line => {
+line = line.trim();
+if (!line) return;
+
+if (/Login/i.test(line)) {
+currentType = "login";
+const m = line.match(/\d{2}:\d{2}/);
+if (m) { currentTime = m[0]; loginTimes.add(currentTime); }
+return;
+}
+
+if (/Logout/i.test(line)) {
+currentType = "logout";
+const m = line.match(/\d{2}:\d{2}/);
+if (m) { currentTime = m[0]; logoutTimes.add(currentTime); }
+return;
+}
+
+if (line.includes("–") && currentType && currentTime) {
+const parts = line.split("–").map(x=>x.trim());
+const cab = parts[0].split(" ").pop();
+const location = parts[1];
+if (!data[cab]) data[cab] = {};
+data[cab][`${currentType}_${currentTime}`] = location;
+}
+});
+
+/* DATE */
+const d = document.getElementById("reportDate").value;
+if (d) {
+document.getElementById("title").innerText =
+"QNITY DAILY TRIPS DATA – " + new Date(d).toLocaleDateString("en-GB");
+}
+
+/* SORT TIMES */
+const sortTime = t => {
+const [h,m] = t.split(":").map(Number);
+return h*60+m;
+};
+
+const pickups = Array.from(loginTimes).sort((a,b)=>sortTime(a)-sortTime(b));
+const drops = Array.from(logoutTimes).sort((a,b)=>sortTime(a)-sortTime(b));
+
+/* HEADER */
+let head = "<tr><th>S.NO</th><th>Cab No</th>";
+pickups.forEach(t=>head+=`<th>Pickup ${t}</th>`);
+drops.forEach(t=>head+=`<th>Drop ${t}</th>`);
+head += "</tr>";
+document.getElementById("tableHead").innerHTML = head;
+
+/* BODY */
+const tbody = document.getElementById("tableBody");
+tbody.innerHTML = "";
+let sno = 1;
+
+Object.keys(data).sort().forEach(cab=>{
+let row = `<tr><td>${sno++}</td><td>${cab}</td>`;
+pickups.forEach(t=>row+=`<td contenteditable class="editable">${data[cab]["login_"+t]||""}</td>`);
+drops.forEach(t=>row+=`<td contenteditable class="editable">${data[cab]["logout_"+t]||""}</td>`);
+row += "</tr>";
+tbody.innerHTML += row;
+});
+
+/* SUMMARY */
+let totalP=0,totalD=0;
+const loginCount={},logoutCount={};
+pickups.forEach(t=>loginCount[t]=0);
+drops.forEach(t=>logoutCount[t]=0);
+
+document.querySelectorAll("#mainTable tbody tr").forEach(r=>{
+pickups.forEach((t,i)=>{
+if (r.cells[2+i].innerText.trim()) { totalP++; loginCount[t]++; }
+});
+drops.forEach((t,i)=>{
+if (r.cells[2+pickups.length+i].innerText.trim()) { totalD++; logoutCount[t]++; }
+});
+});
+
+document.getElementById("loginSummary").innerHTML =
+pickups.map(t=>`<tr><td>${t}</td><td>${loginCount[t]}</td></tr>`).join("");
+
+document.getElementById("logoutSummary").innerHTML =
+drops.map(t=>`<tr><td>${t}</td><td>${logoutCount[t]}</td></tr>`).join("");
+
+document.getElementById("totalPickups").innerText = totalP;
+document.getElementById("totalLogouts").innerText = totalD;
+document.getElementById("totalTrips").innerText = totalP+totalD;
+}
+
+/* OUTPUT FIXED */
+function downloadPDF() {
+html2canvas(document.getElementById("report"), {scale:3}).then(canvas=>{
+const imgData = canvas.toDataURL("image/png");
+const pdf = new jspdf.jsPDF("l","mm","a4");
+
+const pdfWidth = pdf.internal.pageSize.getWidth();
+const pdfHeight = pdf.internal.pageSize.getHeight();
+
+const imgWidth = canvas.width;
+const imgHeight = canvas.height;
+
+const ratio = Math.min(pdfWidth/imgWidth, pdfHeight/imgHeight);
+
+pdf.addImage(imgData,"PNG",0,0,imgWidth*ratio,imgHeight*ratio);
+pdf.save("Daily_Trips_Report.pdf");
+});
+}
+
+function downloadImage() {
+html2canvas(document.getElementById("report"), {scale:3}).then(canvas=>{
+const a=document.createElement("a");
+a.href=canvas.toDataURL("image/jpeg",1.0);
+a.download="Daily_Trips_Report.jpg";
+a.click();
+});
+}
+
+function downloadExcel() {
+const wb = XLSX.utils.book_new();
+const ws = XLSX.utils.table_to_sheet(document.getElementById("mainTable"));
+XLSX.utils.book_append_sheet(wb, ws, "Report");
+XLSX.writeFile(wb, "Daily_Trips_Report.xlsx");
+}
+</script>
+
+</body>
+</html>
