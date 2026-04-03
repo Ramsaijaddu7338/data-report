@@ -1782,7 +1782,7 @@
         } catch(error) {
             document.getElementById('authMsg').innerHTML = `❌ ${error.message}`;
         } finally {
-            document.getElementById('loginBtn').innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Login as Employee';
+            document.getElementById('loginBtn').innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Login';
             document.getElementById('loginBtn').disabled = false;
         }
     });
@@ -1802,7 +1802,7 @@
         } catch(error) {
             document.getElementById('authMsg').innerHTML = `❌ ${error.message}`;
         } finally {
-            document.getElementById('adminLoginBtn').innerHTML = '<i class="bi bi-shield-lock"></i> Login as Admin';
+            document.getElementById('adminLoginBtn').innerHTML = '<i class="bi bi-shield-lock"></i> Login';
             document.getElementById('adminLoginBtn').disabled = false;
         }
     });
