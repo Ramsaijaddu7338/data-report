@@ -1823,13 +1823,13 @@
                     email: currentEmail,
                     mobile: '',
                     joiningDate: new Date().toISOString().split('T')[0],
-                    role: currentEmail === 'ramsai.bbcl7@gmail.com' ? 'admin' : 'employee',
+                    role: currentEmail === 'admin@gmail.com' ? 'admin' : 'employee',
                     joinDate: new Date().toISOString()
                 };
                 await setDoc(userDocRef, userData);
             }
             
-            userRole = (userData.role === 'admin' || currentEmail === 'ramsai.bbcl7@gmail.com') ? 'admin' : 'employee';
+            userRole = (userData.role === 'admin' || currentEmail === 'admin@gmail.com') ? 'admin' : 'employee';
             
             if(userRole === 'admin') {
                 document.getElementById('adminDashboard').style.display = 'block';
